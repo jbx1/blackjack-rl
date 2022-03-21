@@ -1,7 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{VecDeque};
 use rand::{Rng, thread_rng};
 use crate::deck::Deck;
-use crate::qtable::{Action, QTable, State};
+use crate::qtable::{Action, QTable, State, StateAction};
 use crate::round::{RoundState};
 
 #[derive(Debug, Copy, Clone, Hash, Eq)]
@@ -31,19 +31,6 @@ impl Action for BlackjackAction {
 
 }
 
-#[derive(Debug, Copy, Clone, Hash, Eq)]
-pub struct StateAction {
-    agent_state: BlackjackState,
-    action: BlackjackAction,
-}
-
-impl PartialEq for StateAction {
-    fn eq(&self, other: &Self) -> bool {
-        return self.agent_state == other.agent_state && self.action == other.action;
-    }
-}
-
-
 impl BlackjackState {
     pub fn from(round_state: &RoundState) -> BlackjackState {
         return BlackjackState { player: round_state.player.sum, ace: round_state.player.ace, dealer: round_state.dealer.sum };
@@ -52,53 +39,41 @@ impl BlackjackState {
 
 pub fn monte_carlo() {
 
-    // let mut q_table: QTable<BlackjackState, BlackjackAction> = QTable::new(0.0);
+    let mut q_table: QTable<BlackjackState, BlackjackAction> = QTable::new(0.0);
 
-    let mut q_values: HashMap<BlackjackState, HashMap<BlackjackAction, f64>> = HashMap::new();
-    let mut counts: HashMap<StateAction, usize> = HashMap::new();
-
-    for i in 0..500000 {
+    for i in 0 .. 1000000 {
         if i % 1000 == 0 {
             println!("Running episode {:?}", i);
         }
-        evaluate_episode(&mut q_values, &mut counts, i);
+        evaluate_episode(&mut q_table,  i);
     }
 
-    let mut q: Vec<_> = q_values.iter()
-        .map(|(k, l)|
-                 l.iter().map(|(a, v)| (StateAction{agent_state: k.clone(), action: a.clone()}, v)))
-        .flatten()
-        .collect();
-
- //   let mut q: Vec<_> = q_values.iter().collect();
-    q.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-
-    println!("Total state action values: {:?}", q.len());
-    for value in q {
+    let q_values = q_table.get_all_values();
+    println!("Total state action values: {:?}", q_values.len());
+    for value in q_values {
         println!("{:?}", value);
     }
 }
 
-pub fn evaluate_episode(q_values: &mut HashMap<BlackjackState, HashMap<BlackjackAction, f64>>, counts: &mut HashMap<StateAction, usize>, episode_number : usize) -> f64 {
+pub fn evaluate_episode(q_table : &mut QTable<BlackjackState, BlackjackAction>, episode_number : usize) -> f64 {
     let mut deck = Deck::new_shuffled();
-    let result = episode(&mut deck, q_values, episode_number);
+    let result = episode(&mut deck, q_table, episode_number);
 
-    let default_q = 0.0;
     let mut largest_error = 0.0;
 
     for state_action in result.state_actions {
-        let old_value = get_state_action_value(&state_action, q_values, default_q);
-        let count = counts.get(&state_action).cloned().unwrap_or_default();
+
+        let old_value = q_table.get_value(&state_action);
+        let count = q_table.get_count(&state_action) + 1;
 
         let g = result.reward as f64;
 
-        let new_count = count + 1;
         let error = g - old_value;
-        largest_error = f64::max(largest_error, error);
-        let new_value = old_value + error / (new_count as f64);
+        largest_error = f64::max(largest_error, f64::abs(error));
+        let new_value = old_value + (error / count as f64);
+//        println!("Old value for {:?} was {:?} while reward {:?} error is {:?}, new q value is {:?}, count is {:?}", state_action, old_value, g, error, new_value, count);
 
-        counts.insert(state_action, new_count);
-        update_state_action_value(&state_action, q_values, new_value);
+        q_table.update_value(&state_action, new_value);
     }
 
     largest_error
@@ -106,18 +81,18 @@ pub fn evaluate_episode(q_values: &mut HashMap<BlackjackState, HashMap<Blackjack
 
 
 pub struct EpisodeResult {
-    state_actions: VecDeque<StateAction>,
+    state_actions: VecDeque<StateAction<BlackjackState, BlackjackAction>>,
     reward: i32,
 }
 
-pub fn episode(deck: &mut Deck, q_values: &HashMap<BlackjackState, HashMap<BlackjackAction, f64>>, episode_number: usize) -> EpisodeResult {
-    let mut state_actions: VecDeque<StateAction> = VecDeque::new();
+pub fn episode(deck: &mut Deck, q_table : &QTable<BlackjackState, BlackjackAction>, episode_number : usize) -> EpisodeResult {
+    let mut state_actions: VecDeque<StateAction<BlackjackState, BlackjackAction>> = VecDeque::new();
 
     let mut round_state = RoundState::new(deck);
 
     while !round_state.finished() {
         let agent_state = BlackjackState::from(&round_state);
-        let action = e_greedy_policy(&agent_state, q_values, episode_number);
+        let action = e_greedy_policy(&agent_state, q_table, episode_number);
 
         //we push them to the front so that the last state-action pair are at the front
         state_actions.push_front(StateAction { agent_state, action });
@@ -137,7 +112,7 @@ pub fn episode(deck: &mut Deck, q_values: &HashMap<BlackjackState, HashMap<Black
     };
 }
 
-pub fn e_greedy_policy(agent_state: &BlackjackState, q_values: &HashMap<BlackjackState, HashMap<BlackjackAction, f64>>, episode_number: usize) -> BlackjackAction {
+pub fn e_greedy_policy(agent_state: &BlackjackState, q_table : &QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> BlackjackAction {
     return if agent_state.player < 12 {
         BlackjackAction::Hit
     } else if agent_state.player == 21 {
@@ -145,37 +120,8 @@ pub fn e_greedy_policy(agent_state: &BlackjackState, q_values: &HashMap<Blackjac
     } else if epsilon_explore(episode_number) {
         random_action()
     } else {
-        select_greedy_action(agent_state, q_values)
+        q_table.select_greedy_action(agent_state).unwrap_or_else(|| random_action())
     };
-}
-
-fn get_state_action_value(state_action: &StateAction, q_values: &HashMap<BlackjackState, HashMap<BlackjackAction, f64>>, default: f64) -> f64 {
-    q_values.get(&state_action.agent_state)
-        .and_then(|map| map.get(&state_action.action))
-        .map(|a| *a)
-        .unwrap_or(default)
-}
-
-fn update_state_action_value(state_action: &StateAction, q_values: &mut HashMap<BlackjackState, HashMap<BlackjackAction, f64>>, new_value: f64) {
-    let state_action_values = q_values.entry(state_action.agent_state).or_insert_with(|| HashMap::new());
-    state_action_values.insert(state_action.action, new_value);
-}
-
-fn select_greedy_action(agent_state: &BlackjackState, q_values: &HashMap<BlackjackState, HashMap<BlackjackAction, f64>>) -> BlackjackAction {
-    let action_values = q_values.get(agent_state);
-
-    action_values
-        .filter(|map| !map.is_empty())
-        .and_then(|map| select_best_action(map))
-        .map(|opt| opt.clone())
-        .unwrap_or_else(|| random_action())
-}
-
-fn select_best_action(action_values: &HashMap<BlackjackAction, f64>) -> Option<&BlackjackAction> {
-    let mut q: Vec<_> = action_values.iter().collect();
-    q.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-
-    q.first().map(|v| v.0)
 }
 
 fn epsilon_explore(episode: usize) -> bool {

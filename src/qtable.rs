@@ -1,19 +1,20 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::hash::Hash;
 
 
-pub trait State : Eq + Hash + Clone {
+pub trait State : Eq + Hash + Clone + Debug {
 
 }
 
-pub trait Action : Eq + Hash + Clone {
+pub trait Action : Eq + Hash + Clone + Debug {
 
 }
 
 #[derive(Debug, Copy, Clone, Hash, Eq)]
 pub struct StateAction<S: State, A: Action> {
-    agent_state: S,
-    action: A,
+    pub agent_state: S,
+    pub action: A,
 }
 
 impl<S: State, A: Action> PartialEq for StateAction<S,A> {
@@ -21,7 +22,6 @@ impl<S: State, A: Action> PartialEq for StateAction<S,A> {
         return self.agent_state == other.agent_state && self.action == other.action;
     }
 }
-
 
 pub struct QTable<S: State, A: Action> {
     q_values: HashMap<S, HashMap<A, f64>>,
@@ -72,5 +72,22 @@ impl<S: State, A: Action> QTable<S, A> {
         q.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
 
         q.first().map(|v| v.0.clone())
+    }
+
+    pub fn get_all_values(&self) -> Vec<(StateAction<S,A>, f64)> {
+
+        println!("Counts:");
+        for (key, value) in &self.counts {
+            println!("{:?}: {:?}", key, value);
+        }
+
+        let mut q: Vec<(StateAction<S,A>, f64)> = self.q_values.iter()
+            .map(|(k, l)|
+                l.iter().map(|(a, v)| (StateAction{agent_state: k.clone(), action: a.clone()}, v.clone())))
+            .flatten()
+            .collect();
+
+        q.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        return q
     }
 }
