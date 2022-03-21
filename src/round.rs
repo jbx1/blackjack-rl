@@ -21,12 +21,12 @@ impl RoundState {
     pub fn new(deck: &mut Deck) -> RoundState {
         let player_c1 = deal(deck);
         let player_c2 = deal(deck);
-        println!("Cards dealt to player: {:?} {:?}", player_c1, player_c2);
+  //      println!("Cards dealt to player: {:?} {:?}", player_c1, player_c2);
 
         let player = Hand::from(player_c1, player_c2);
 
         let dealer_card = deal(deck);
-        println!("Card dealt to dealer: {:?}", dealer_card);
+//        println!("Card dealt to dealer: {:?}", dealer_card);
         let dealer = Hand::new().hit(dealer_card);
 
         return RoundState { outcome: Outcome::Playing, player, dealer };
@@ -95,20 +95,20 @@ impl RoundState {
 
     fn hit_player(player_hand: &Hand, deck: &mut Deck) -> Hand {
         let card = deal(deck);
-        println!("Card dealt to player: {:?}", card);
+//        println!("Card dealt to player: {:?}", card);
         return player_hand.hit(card);
     }
 
     fn hit_dealer(dealer_hand: &Hand, deck: &mut Deck) -> Hand {
         let card = deal(deck);
-        println!("Card dealt to dealer: {:?}", card);
+  //      println!("Card dealt to dealer: {:?}", card);
         let new_dealer_hand = dealer_hand.hit(card);
 
         return if new_dealer_hand.sum < 17 {
-            println!("Dealer sum {:?}, still less than 17", new_dealer_hand.sum);
+    //        println!("Dealer sum {:?}, still less than 17", new_dealer_hand.sum);
             RoundState::hit_dealer(&new_dealer_hand, deck)
         } else {
-            println!("Dealer stays at sum {:?}", new_dealer_hand.sum);
+      //      println!("Dealer stays at sum {:?}", new_dealer_hand.sum);
             new_dealer_hand
         };
     }
