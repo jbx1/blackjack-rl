@@ -76,10 +76,10 @@ impl<S: State, A: Action> QTable<S, A> {
 
     pub fn get_all_values(&self) -> Vec<(StateAction<S,A>, f64)> {
 
-        println!("Counts:");
-        for (key, value) in &self.counts {
-            println!("{:?}: {:?}", key, value);
-        }
+        // println!("Counts:");
+        // for (key, value) in &self.counts {
+        //     println!("{:?}: {:?}", key, value);
+        // }
 
         let mut q: Vec<(StateAction<S,A>, f64)> = self.q_values.iter()
             .map(|(k, l)|
