@@ -39,6 +39,7 @@ fn play() {
 }
 
 fn main() {
+
     //play();
     let start = Instant::now();
     monte_carlo();

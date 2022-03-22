@@ -7,13 +7,11 @@ use crate::round::{RoundState};
 #[derive(Debug, Copy, Clone, Hash, Eq)]
 pub struct BlackjackState {
     player: u8,
-    ace: bool,
     dealer: u8,
+    ace: bool,
 }
 
-impl State for BlackjackState {
-
-}
+impl State for BlackjackState {}
 
 impl PartialEq for BlackjackState {
     fn eq(&self, other: &Self) -> bool {
@@ -27,9 +25,7 @@ pub enum BlackjackAction {
     Stand,
 }
 
-impl Action for BlackjackAction {
-
-}
+impl Action for BlackjackAction {}
 
 impl BlackjackState {
     pub fn from(round_state: &RoundState) -> BlackjackState {
@@ -38,14 +34,13 @@ impl BlackjackState {
 }
 
 pub fn monte_carlo() {
-
     let mut q_table: QTable<BlackjackState, BlackjackAction> = QTable::new(0.0);
 
-    for i in 0 .. 1000000 {
+    for i in 0..1000000 {
         if i % 1000 == 0 {
             println!("Running episode {:?}", i);
         }
-        evaluate_episode(&mut q_table,  i);
+        evaluate_episode(&mut q_table, i);
     }
 
     let q_values = q_table.get_all_values();
@@ -55,25 +50,26 @@ pub fn monte_carlo() {
     }
 }
 
-pub fn evaluate_episode(q_table : &mut QTable<BlackjackState, BlackjackAction>, episode_number : usize) -> f64 {
+pub fn evaluate_episode(q_table: &mut QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> f64 {
     let mut deck = Deck::new_shuffled();
     let result = episode(&mut deck, q_table, episode_number);
 
     let mut largest_error = 0.0;
 
     for state_action in result.state_actions {
+        if state_action.agent_state.player > 11 && state_action.agent_state.player < 21 {
+            let old_value = q_table.get_value(&state_action);
+            let count = q_table.get_count(&state_action) + 1;
 
-        let old_value = q_table.get_value(&state_action);
-        let count = q_table.get_count(&state_action) + 1;
+            let g = result.reward as f64;
 
-        let g = result.reward as f64;
+            let error = g - old_value;
+            largest_error = f64::max(largest_error, f64::abs(error));
+            let new_value = old_value + (error / count as f64);
+    //        println!("Old value for {:?} was {:?} while reward {:?} error is {:?}, new q value is {:?}, count is {:?}", state_action, old_value, g, error, new_value, count);
 
-        let error = g - old_value;
-        largest_error = f64::max(largest_error, f64::abs(error));
-        let new_value = old_value + (error / count as f64);
-//        println!("Old value for {:?} was {:?} while reward {:?} error is {:?}, new q value is {:?}, count is {:?}", state_action, old_value, g, error, new_value, count);
-
-        q_table.update_value(&state_action, new_value);
+            q_table.update_value(&state_action, new_value);
+        }
     }
 
     largest_error
@@ -85,7 +81,7 @@ pub struct EpisodeResult {
     reward: i32,
 }
 
-pub fn episode(deck: &mut Deck, q_table : &QTable<BlackjackState, BlackjackAction>, episode_number : usize) -> EpisodeResult {
+pub fn episode(deck: &mut Deck, q_table: &QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> EpisodeResult {
     let mut state_actions: VecDeque<StateAction<BlackjackState, BlackjackAction>> = VecDeque::new();
 
     let mut round_state = RoundState::new(deck);
@@ -112,7 +108,7 @@ pub fn episode(deck: &mut Deck, q_table : &QTable<BlackjackState, BlackjackActio
     };
 }
 
-pub fn e_greedy_policy(agent_state: &BlackjackState, q_table : &QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> BlackjackAction {
+pub fn e_greedy_policy(agent_state: &BlackjackState, q_table: &QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> BlackjackAction {
     return if agent_state.player < 12 {
         BlackjackAction::Hit
     } else if agent_state.player == 21 {
@@ -126,8 +122,16 @@ pub fn e_greedy_policy(agent_state: &BlackjackState, q_table : &QTable<Blackjack
 
 fn epsilon_explore(episode: usize) -> bool {
     //assuming the first episode is 0
-    let epsilon = 1.0 / (episode + 1) as f64;
 
+    let epsilon = if episode < 500000 {
+        0.1
+    } else {
+        1.0 / (episode + 1) as f64
+    };
+
+//     let epsilon = 0.1;
+// //    let epsilon = 1.0 / (episode + 1) as f64;
+//
     //this generates a number between 0 (inclusive) and 1 (exclusive)
     let rnd = thread_rng().gen::<f64>();
 
