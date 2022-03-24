@@ -33,7 +33,7 @@ impl BlackjackState {
     }
 }
 
-pub fn monte_carlo() {
+pub fn sarsa() {
     let mut q_table: QTable<BlackjackState, BlackjackAction> = QTable::new(0.0);
 
     let mut wins = 0;
@@ -43,8 +43,7 @@ pub fn monte_carlo() {
     let episodes = 500000;
     let mut count = 0.0;
     for i in 0..episodes {
-        if i % 1000 == 0
-            {
+        if i % 1000 == 0 {
             println!("\"{:?}\",\"{:?}\",\"{:?}\",\"{:?}\",\"{:?}\"", i, wins, losses, draws, avg_error);
             wins = 0;
             losses = 0;
@@ -77,28 +76,8 @@ pub fn evaluate_episode(q_table: &mut QTable<BlackjackState, BlackjackAction>, e
     let mut deck = Deck::new_shuffled();
     let result = episode(&mut deck, q_table, episode_number);
 
-    let mut sum_error = 0.0;
-    let state_action_count = result.state_actions.len();
-    for state_action in result.state_actions {
-        if state_action.agent_state.player > 11 && state_action.agent_state.player < 21 {
-            let old_value = q_table.get_value(&state_action);
-            let count = q_table.get_count(&state_action) + 1;
-
-            let g = result.reward as f64;
-
-            let error = g - old_value;
-            let new_value = old_value + (error / count as f64);
-
-            sum_error = sum_error + f64::abs(error);
-
-    //        println!("Old value for {:?} was {:?} while reward {:?} error is {:?}, new q value is {:?}, count is {:?}", state_action, old_value, g, error, new_value, count);
-
-            q_table.update_value(&state_action, new_value);
-        }
-    }
-
-    let mean_error = sum_error / state_action_count as f64;
-    (result.reward, mean_error)
+//    let mean_error = sum_error / state_action_count as f64;
+    (result.reward, 0.0)
 }
 
 
@@ -107,30 +86,71 @@ pub struct EpisodeResult {
     reward: i32,
 }
 
-pub fn episode(deck: &mut Deck, q_table: &QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> EpisodeResult {
+pub fn episode(deck: &mut Deck, q_table: &mut QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> EpisodeResult {
+//    let step_size = 0.01;
     let mut state_actions: VecDeque<StateAction<BlackjackState, BlackjackAction>> = VecDeque::new();
 
     let mut round_state = RoundState::new(deck);
-
-//    let mut random_start = episode_number < 100000;
-    let mut random_start = false;
+    let mut agent_state = BlackjackState::from(&round_state);
+    let mut action = e_greedy_policy(&agent_state, q_table, episode_number);
+    let mut state_action = StateAction{ agent_state, action };
 
     while !round_state.finished() {
-        let agent_state = BlackjackState::from(&round_state);
-        let action = if random_start {
-            random_start = false;
-            random_policy(&agent_state, q_table, episode_number)
-        } else {
-            e_greedy_policy(&agent_state, q_table, episode_number)
+        //apply the action
+        state_actions.push_front(state_action);
+        let new_round_state = match action {
+            BlackjackAction::Hit => round_state.hit(deck).unwrap(),
+            BlackjackAction::Stand => round_state.stand(deck).unwrap()
         };
 
-        //we push them to the front so that the last state-action pair are at the front
-        state_actions.push_front(StateAction { agent_state, action });
+        if round_state.player.sum >= 12 && round_state.player.sum <= 20 {
+            let reward = if new_round_state.won() {
+                1
+            }
+            else if new_round_state.lost() {
+                -1
+            } else {
+                0
+            } as f64;
 
-        match action {
-            BlackjackAction::Hit => round_state = round_state.hit(deck).unwrap(),
-            BlackjackAction::Stand => round_state = round_state.stand(deck).unwrap()
+            let q_next = if !new_round_state.finished() {
+                //one-step look ahead
+                let next_agent_state = BlackjackState::from(&new_round_state);
+
+                let next_action = e_greedy_policy(&next_agent_state, q_table, episode_number);
+                let next_state_action = StateAction{agent_state: next_agent_state, action: next_action };
+
+                action = next_action;
+                agent_state = next_agent_state;
+                // q_table.get_value(&next_state_action)
+
+                //for q-learning use greedy_policy() instead
+                let best_action = greedy_policy(&agent_state, q_table, episode_number);
+                q_table.get_value(&StateAction{agent_state: next_agent_state, action: best_action })
+            } else {
+                //q for terminal state is 0
+                0.0
+            };
+
+            let count = q_table.get_count(&state_action);
+            let q_value = q_table.get_value(&state_action);
+            let step_size = 1.0 / (count + 1) as f64;
+            let new_q_value = q_value + step_size * (reward + q_next - q_value);
+            if new_q_value != q_value {
+
+                q_table.update_value(&state_action, new_q_value);
+            }
+
+        } else if !round_state.finished() {
+            //we had an obvious action no need to update q_values
+
+            //compute the new state, and find what the next action should be
+            agent_state = BlackjackState::from(&new_round_state);
+            action = e_greedy_policy(&agent_state, q_table, episode_number);
         }
+
+        state_action = StateAction{agent_state, action};
+        round_state = new_round_state;
     }
 
     return if round_state.won() {
@@ -154,6 +174,17 @@ pub fn e_greedy_policy(agent_state: &BlackjackState, q_table: &QTable<BlackjackS
     };
 }
 
+pub fn greedy_policy(agent_state: &BlackjackState, q_table: &QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> BlackjackAction {
+    return if agent_state.player < 12 {
+        BlackjackAction::Hit
+    } else if agent_state.player == 21 {
+        BlackjackAction::Stand
+    } else {
+        q_table.select_greedy_action(agent_state).unwrap_or_else(|| random_action())
+    };
+}
+
+
 pub fn random_policy(agent_state: &BlackjackState, q_table: &QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> BlackjackAction {
     return if agent_state.player < 12 {
         BlackjackAction::Hit
@@ -165,10 +196,22 @@ pub fn random_policy(agent_state: &BlackjackState, q_table: &QTable<BlackjackSta
 }
 
 fn epsilon_explore(episode: usize) -> bool {
-    //assuming the first episode is 0
+//    assuming the first episode is 0
+//     let epsilon = if episode < 100000 {
+//         //explore consistently for the first 100k episodes
+//         0.1
+//     } else {
+//         //become greedier after 500k episodes
+//         1.0 / (episode + 1) as f64
+//     };
+
+    let epsilon = 0.1;
+
 //    let epsilon = 1.0 / (episode + 1) as f64;
 
-    let epsilon = f64::exp( episode as f64 / -10000.0);
+//   let epsilon = f64::exp( episode as f64 / -10000.0);
+//   println!("Epsilon: {:?}", epsilon);
+
     //this generates a number between 0 (inclusive) and 1 (exclusive)
     let rnd = thread_rng().gen::<f64>();
 

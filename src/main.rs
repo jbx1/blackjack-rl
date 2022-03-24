@@ -2,6 +2,7 @@ use std::io::stdin;
 use std::time::{Instant};
 use blackjack::monte_carlo::monte_carlo;
 use blackjack::monte_carlo_with_counting::monte_carlo_cardcounting;
+use blackjack::sarsa::sarsa;
 use crate::deck::Deck;
 use crate::round::{Outcome, RoundState};
 
@@ -43,7 +44,8 @@ fn main() {
 
     //play();
     let start = Instant::now();
-    monte_carlo();
+//    monte_carlo();
+    sarsa();
 //    monte_carlo_cardcounting();
     let dur = start.elapsed();
     println!("Total time: {:?}", dur);
