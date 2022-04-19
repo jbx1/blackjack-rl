@@ -1,8 +1,8 @@
 use std::io::stdin;
 use std::time::Instant;
 
-use blackjack::monte_carlo::monte_carlo;
-use blackjack::sarsa::{sarsa, sarsamax};
+use blackjack_rl::monte_carlo::monte_carlo;
+use blackjack_rl::sarsa::{sarsa, sarsamax};
 
 use crate::deck::Deck;
 use crate::round::{Outcome, RoundState};
