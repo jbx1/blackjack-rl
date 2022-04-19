@@ -1,8 +1,9 @@
 use std::io::stdin;
-use std::time::{Instant};
+use std::time::Instant;
+
 use blackjack::monte_carlo::monte_carlo;
-use blackjack::monte_carlo_with_counting::monte_carlo_cardcounting;
-use blackjack::sarsa::sarsa;
+use blackjack::sarsa::{sarsa, sarsamax};
+
 use crate::deck::Deck;
 use crate::round::{Outcome, RoundState};
 
@@ -42,11 +43,12 @@ fn play() {
 
 fn main() {
 
+    //todo: parse command line parameters with an API such as https://crates.io/crates/clap
     //play();
     let start = Instant::now();
 //    monte_carlo();
     sarsa();
-//    monte_carlo_cardcounting();
+//    sarsamax(); //q-learning
     let dur = start.elapsed();
     println!("Total time: {:?}", dur);
 }

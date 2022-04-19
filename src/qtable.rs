@@ -3,13 +3,9 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 
-pub trait State : Eq + Hash + Clone + Debug {
+pub trait State: Eq + Hash + Clone + Debug {}
 
-}
-
-pub trait Action : Eq + Hash + Clone + Debug {
-
-}
+pub trait Action: Eq + Hash + Clone + Debug {}
 
 #[derive(Debug, Copy, Clone, Hash, Eq)]
 pub struct StateAction<S: State, A: Action> {
@@ -17,7 +13,7 @@ pub struct StateAction<S: State, A: Action> {
     pub action: A,
 }
 
-impl<S: State, A: Action> PartialEq for StateAction<S,A> {
+impl<S: State, A: Action> PartialEq for StateAction<S, A> {
     fn eq(&self, other: &Self) -> bool {
         return self.agent_state == other.agent_state && self.action == other.action;
     }
@@ -25,14 +21,13 @@ impl<S: State, A: Action> PartialEq for StateAction<S,A> {
 
 pub struct QTable<S: State, A: Action> {
     q_values: HashMap<S, HashMap<A, f64>>,
-    counts: HashMap<StateAction<S,A>, usize>,
-    default_value: f64
+    counts: HashMap<StateAction<S, A>, usize>,
+    default_value: f64,
 }
 
 impl<S: State, A: Action> QTable<S, A> {
-
-    pub fn new(default_value: f64) -> QTable<S, A>{
-        return QTable { q_values: HashMap::new(), counts: HashMap::new(), default_value }
+    pub fn new(default_value: f64) -> QTable<S, A> {
+        return QTable { q_values: HashMap::new(), counts: HashMap::new(), default_value };
     }
 
     pub fn get_value(&self, state_action: &StateAction<S, A>) -> f64 {
@@ -74,20 +69,19 @@ impl<S: State, A: Action> QTable<S, A> {
         q.first().map(|v| v.0.clone())
     }
 
-    pub fn get_all_values(&self) -> Vec<(StateAction<S,A>, f64)> {
+    pub fn get_all_values(&self) -> Vec<(StateAction<S, A>, f64)> {
+        // println!("Counts:");
+        // for (key, value) in &self.counts {
+        //     println!("{:?}: {:?}", key, value);
+        // }
 
-        println!("Counts:");
-        for (key, value) in &self.counts {
-            println!("{:?}: {:?}", key, value);
-        }
-
-        let mut q: Vec<(StateAction<S,A>, f64)> = self.q_values.iter()
+        let mut q: Vec<(StateAction<S, A>, f64)> = self.q_values.iter()
             .map(|(k, l)|
-                l.iter().map(|(a, v)| (StateAction{agent_state: k.clone(), action: a.clone()}, v.clone())))
+                l.iter().map(|(a, v)| (StateAction { agent_state: k.clone(), action: a.clone() }, v.clone())))
             .flatten()
             .collect();
 
         q.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-        return q
+        return q;
     }
 }
