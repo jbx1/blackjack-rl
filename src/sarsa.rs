@@ -4,23 +4,21 @@ use crate::blackjack_policy::{e_greedy_policy, greedy_policy};
 use crate::deck::Deck;
 use crate::qtable::{QTable, StateAction};
 use crate::round::{RoundState};
-use crate::trainer::Trainer;
+use crate::learner::Learner;
 
 pub enum Mode {
     SARSA,
     SARSAMAX //a.k.a Q-Learning
 }
 
-pub fn sarsa() {
+pub fn sarsa() -> Learner {
   println!("Running in SARSA mode");
-  let mut trainer = Trainer::new();
-  trainer.train(evaluate_episode_sarsa);
+  Learner::new_trained(evaluate_episode_sarsa)
 }
 
-pub fn sarsamax() {
+pub fn sarsamax() -> Learner {
     println!("Running in SARSAMAX (Q-Learning) mode");
-    let mut trainer = Trainer::new();
-    trainer.train(evaluate_episode_sarsamax);
+    Learner::new_trained(evaluate_episode_sarsamax)
 }
 
 pub fn evaluate_episode_sarsa(q_table: &mut QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> (i32, f64) {

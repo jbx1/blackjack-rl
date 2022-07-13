@@ -9,6 +9,6 @@ pub mod qtable;
 pub mod sarsa;
 pub mod blackjack_agent;
 pub mod blackjack_policy;
-pub mod trainer;
+pub mod learner;
 
 

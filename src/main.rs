@@ -1,6 +1,8 @@
 use std::io::stdin;
 use std::time::Instant;
 
+//use clap::Parser;
+
 use blackjack_rl::monte_carlo::monte_carlo;
 use blackjack_rl::sarsa::{sarsa, sarsamax};
 
@@ -41,14 +43,32 @@ fn play() {
     }
 }
 
+
+
+// #[derive(Parser, Debug)]
+// #[clap(author, version, about, long_about = None)]
+// struct Args {
+//     /// Name of the person to greet
+//     #[clap(short, long)]
+//     mode: String,
+//
+//     /// Number of times to greet
+//     #[clap(short, long, default_value_t = 1)]
+//     count: u8,
+// }
+
 fn main() {
+
+    //let args = Args::parse();
 
     //todo: parse command line parameters with an API such as https://crates.io/crates/clap
     //play();
     let start = Instant::now();
-//    monte_carlo();
-    sarsa();
-//    sarsamax(); //q-learning
+//    let learner = monte_carlo();
+    let learner = sarsa();
+//  let learner = sarsamax(); //q-learning
     let dur = start.elapsed();
     println!("Total time: {:?}", dur);
+
+    learner.print_strategy();
 }

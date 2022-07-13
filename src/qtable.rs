@@ -84,4 +84,10 @@ impl<S: State, A: Action> QTable<S, A> {
         q.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         return q;
     }
+
+    pub fn get_policy(&self) -> HashMap<S,A> {
+        self.q_values.iter()
+            .map(|(s, a)| (s.clone(), self.select_best_action(a).unwrap()))
+            .collect()
+    }
 }

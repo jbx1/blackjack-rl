@@ -5,12 +5,11 @@ use crate::blackjack_policy::{e_greedy_policy, random_policy};
 use crate::deck::Deck;
 use crate::qtable::{QTable, StateAction};
 use crate::round::RoundState;
-use crate::trainer::Trainer;
+use crate::learner::Learner;
 
-pub fn monte_carlo() {
+pub fn monte_carlo() -> Learner {
     println!("Running in Monte Carlo mode");
-    let mut trainer = Trainer::new();
-    trainer.train(evaluate_episode);
+    Learner::new_trained(evaluate_episode)
 }
 
 pub fn evaluate_episode(q_table: &mut QTable<BlackjackState, BlackjackAction>, episode_number: usize) -> (i32, f64) {
